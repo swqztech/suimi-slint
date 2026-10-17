@@ -1,0 +1,8 @@
+随密（C++ Slint 版）— 本地随机密码 / 用户名 / 网名生成器（绿色版）
+
+使用：双击「随密-Slint.exe」或「启动.bat」。
+
+基于 Slint 原生 UI，数据仅在本机生成。
+需要 Windows 10/11 64 位。
+
+https://github.com/swqztech/suimi-slint

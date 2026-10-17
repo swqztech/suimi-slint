@@ -1,0 +1,320 @@
+import { VerticalBox, HorizontalBox, ScrollView, Slider } from "std-widgets.slint";
+
+component PrimaryButton inherits Rectangle {
+    in property <string> text;
+    callback clicked <=> touch.clicked;
+    background: touch.pressed ? #2e9950 : touch.has-hover ? #47c47a : #3bb366;
+    border-radius: 6px;
+    min-width: 112px;
+    min-height: 40px;
+    touch := TouchArea {}
+    Text {
+        text: parent.text;
+        color: #fff;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+component SecondaryButton inherits Rectangle {
+    in property <string> text;
+    callback clicked <=> touch.clicked;
+    background: touch.pressed ? #283840 : touch.has-hover ? #243038 : #202c30;
+    border-width: 1px;
+    border-color: #37484e;
+    border-radius: 6px;
+    min-width: 80px;
+    min-height: 40px;
+    touch := TouchArea {}
+    Text {
+        text: parent.text;
+        color: #c8d0d2;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+// 自绘选项：深色背景下比系统 CheckBox 文字更清晰
+component OptionToggle inherits Rectangle {
+    in property <string> label;
+    in-out property <bool> checked;
+    callback toggled();
+
+    min-height: 34px;
+    border-radius: 8px;
+    background: touch.pressed ? #283840 : touch.has-hover ? #243038 : #1e2a2e;
+    border-width: 1px;
+    border-color: root.checked ? #8c7648 : #455a62;
+
+    touch := TouchArea {
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 12px;
+        spacing: 8px;
+
+        Rectangle {
+            width: 18px;
+            height: 18px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+            background: root.checked ? #3bb366 : #121c20;
+            border-width: 1px;
+            border-color: root.checked ? #5cd68a : #78878e;
+
+            Text {
+                text: root.checked ? "✓" : "";
+                color: #ffffff;
+                font-size: 12px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Text {
+            text: root.label;
+            color: root.checked ? #e8d48a : #e2e8ea;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "随密";
+    preferred-width: 520px;
+    preferred-height: 720px;
+    background: #1a2628;
+    default-font-family: "Microsoft YaHei UI";
+    default-font-size: 15px;
+
+    in-out property <int> mode: 0;
+    in-out property <float> pw-length: 20;
+    in-out property <float> user-length: 12;
+    in-out property <bool> use-lowercase: true;
+    in-out property <bool> use-uppercase: true;
+    in-out property <bool> use-digits: true;
+    in-out property <bool> use-symbols: true;
+    in-out property <bool> exclude-ambiguous: true;
+    in-out property <[string]> lines;
+    in-out property <string> copy-text: "";
+    in-out property <string> strength-label: "";
+    in-out property <float> strength-bits: 0;
+    in-out property <float> strength-ratio: 0;
+    in-out property <string> toast: "";
+
+    callback request-roll();
+    callback request-roll-six();
+    callback request-copy-all();
+    callback request-copy-line(int);
+    callback mode-changed(int);
+    callback options-changed();
+
+    VerticalBox {
+        padding: 20px;
+        spacing: 12px;
+
+        Text {
+            text: "随密";
+            font-size: 28px;
+            font-weight: 700;
+            color: #d4af5f;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: "掷一次，拿一把新钥匙";
+            horizontal-alignment: center;
+            color: #d0d5d6;
+        }
+        Text {
+            text: "本地生成 · 不上传 · 系统安全随机源";
+            font-size: 12px;
+            color: #78878e;
+            horizontal-alignment: center;
+        }
+
+        HorizontalBox {
+            spacing: 8px;
+            alignment: center;
+            for tab-label[idx] in ["密码", "用户名", "网名"] : Rectangle {
+                border-radius: 6px;
+                background: root.mode == idx ? #2d3e44 : #202c30;
+                border-width: 1px;
+                border-color: root.mode == idx ? #8c7648 : #37484e;
+                min-height: 36px;
+                min-width: 88px;
+                TouchArea {
+                    clicked => { root.mode-changed(idx); }
+                }
+                Text {
+                    text: tab-label;
+                    color: root.mode == idx ? #d4af5f : #78878e;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        Rectangle {
+            min-height: 100px;
+            background: #121c20;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #37484e;
+            ScrollView {
+                VerticalBox {
+                    padding: 10px;
+                    spacing: 6px;
+                    for line[idx] in root.lines : Rectangle {
+                        background: touch.has-hover ? #1a2830 : transparent;
+                        border-radius: 4px;
+                        touch := TouchArea {
+                            clicked => { root.request-copy-line(idx); }
+                        }
+                        Text {
+                            text: line;
+                            wrap: word-wrap;
+                            color: #e8ecee;
+                            font-family: "Consolas";
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.mode == 0 : VerticalBox {
+            spacing: 6px;
+            Rectangle {
+                height: 8px;
+                background: #233033;
+                border-radius: 4px;
+                Rectangle {
+                    width: parent.width * root.strength-ratio;
+                    height: 100%;
+                    background: #48c47a;
+                    border-radius: 4px;
+                }
+            }
+            Text {
+                text: root.strength-label + " · 约 " + round(root.strength-bits) + " bit";
+                font-size: 12px;
+                color: #a8b4b8;
+            }
+        }
+
+        if root.mode == 0 : HorizontalBox {
+            spacing: 10px;
+            Text { text: "长度"; color: #a8b4b8; vertical-alignment: center; }
+            Slider {
+                minimum: 6;
+                maximum: 64;
+                value: root.pw-length;
+                changed(v) => {
+                    root.pw-length = v;
+                    root.options-changed();
+                }
+            }
+            Text {
+                text: round(root.pw-length);
+                color: #d4af5f;
+                font-weight: 600;
+                min-width: 28px;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.mode == 1 : HorizontalBox {
+            spacing: 10px;
+            Text { text: "长度"; color: #a8b4b8; vertical-alignment: center; }
+            Slider {
+                minimum: 4;
+                maximum: 32;
+                value: root.user-length;
+                changed(v) => {
+                    root.user-length = v;
+                    root.options-changed();
+                }
+            }
+            Text {
+                text: round(root.user-length);
+                color: #d4af5f;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.mode == 0 : VerticalBox {
+            spacing: 8px;
+            HorizontalBox {
+                spacing: 8px;
+                OptionToggle {
+                    label: "小写 a-z";
+                    checked <=> root.use-lowercase;
+                    toggled => { root.options-changed(); }
+                }
+                OptionToggle {
+                    label: "大写 A-Z";
+                    checked <=> root.use-uppercase;
+                    toggled => { root.options-changed(); }
+                }
+            }
+            HorizontalBox {
+                spacing: 8px;
+                OptionToggle {
+                    label: "数字 0-9";
+                    checked <=> root.use-digits;
+                    toggled => { root.options-changed(); }
+                }
+                OptionToggle {
+                    label: "符号 !@#";
+                    checked <=> root.use-symbols;
+                    toggled => { root.options-changed(); }
+                }
+            }
+            OptionToggle {
+                label: "排除易混 0OIl1";
+                checked <=> root.exclude-ambiguous;
+                toggled => { root.options-changed(); }
+            }
+        }
+
+        if root.mode == 1 : Text {
+            text: "以小写字母开头，可含数字与下划线";
+            font-size: 13px;
+            color: #a8b4b8;
+            wrap: word-wrap;
+        }
+        if root.mode == 2 : Text {
+            text: "从内置词库随机组合中文网名，可带数字后缀";
+            font-size: 13px;
+            color: #a8b4b8;
+            wrap: word-wrap;
+        }
+
+        HorizontalBox {
+            spacing: 10px;
+            PrimaryButton { text: "再掷一次"; clicked => { root.request-roll(); } }
+            SecondaryButton { text: "复制全部"; clicked => { root.request-copy-all(); } }
+            SecondaryButton { text: "一次六个"; clicked => { root.request-roll-six(); } }
+        }
+
+        if root.toast != "" : Text {
+            text: root.toast;
+            color: #d4af5f;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: "Passroll · 字符从勾选集合中均匀抽取";
+            font-size: 11px;
+            color: #78878e;
+            horizontal-alignment: center;
+        }
+    }
+}

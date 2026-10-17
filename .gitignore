@@ -1,0 +1,9 @@
+/build
+/out
+/dist
+/third_party
+/packaging/installer-stage
+/packaging/inno-stage
+/_deps
+CMakeUserPresets.json
+*.user
